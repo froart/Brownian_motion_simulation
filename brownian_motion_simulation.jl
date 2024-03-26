@@ -3,22 +3,25 @@ using GLMakie, GeometryBasics, Observables, LinearAlgebra
 GLMakie.activate!()
 GLMakie.closeall()
 
-num_particles = 20
+num_particles = 2
 zoomframeside = Observable(0.4)
 containerside = 2 # cm
 particle_diam = 0.1 # cm
-diam_for_scat = Observable( particle_diam * 240 )
-maxspeed      = 0.1
+diam_for_scat = Observable( particle_diam * 270 )
+maxspeed      = 0.05
+dt            = 1
 
 # Define initial positions and velocities for the circles
-positions  = Observable([ Point2f0( ( -particle_diam/2 + containerside ) * rand() + particle_diam/2, 
-				    ( -particle_diam/2 + containerside ) * rand() + particle_diam/2 ) 
-			                 for _ in 1:num_particles ])
-velocities = [ Vec2f0( maxspeed * rand() * rand([-1,1]), 
-		       maxspeed * rand() * rand([-1,1])) 
-                           for _ in 1:num_particles ]
+#positions  = Observable([ Point2f0( ( -particle_diam/2 + containerside ) * rand() + particle_diam/2, 
+#				    ( -particle_diam/2 + containerside ) * rand() + particle_diam/2 ) 
+#			                 for _ in 1:num_particles ])
+#velocities = [ Vec2f0( maxspeed * rand() * rand([-1,1]), 
+#		       maxspeed * rand() * rand([-1,1])) 
+#                           for _ in 1:num_particles ]
+positions = Observable( [ Point2f0( 0.5, 1.0 ), Point2f0( 1.5, 1.0 ) ] )
+velocities = [ Vec2f0( maxspeed, 0.0 ), Vec2f0( -maxspeed, 0.0 ) ] 
 
-fig = Figure(size = (1240, 860))
+fig = Figure(size = (600, 600))
 colsize!(fig.layout, 1, Relative(1))
 
 fig[1, 1] = grid1 = GridLayout()
@@ -58,33 +61,36 @@ scat = scatter!(ax, positions, markersize = diam_for_scat)
 # Animation function
 function update(positions, velocities)
 
-    pair_check = [] # clear
-
     for i in 1:num_particles
 	# Check for collisions with other particles and exchange velocities if needed
         for j in 1:num_particles
-            if j == i #=|| (j, i) in pair_check=# continue end
-	    if sqrt(( positions[][i][1] - positions[][j][1] )^2 + ( positions[][i][2] - positions[][j][2] )^2 ) < particle_diam
-	       d = [ positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] ]
-	       magn_d_v1 = dot( d, velocities[i] ) / sum( d .^ 2 )
-               proj_d_v1 = magn_d_v1 * d
-	       if magn_d_v1 > 0
-                  velocities[j] = Vec2f0( velocities[j][1] + proj_d_v1[1], velocities[j][2] + proj_d_v1[2])
-                  velocities[i] = Vec2f0( velocities[i][1] - proj_d_v1[1], velocities[i][2] - proj_d_v1[2])
-               end
+	    if j == i continue end
+	    # if collision
+	    if sqrt( ( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2 ) <= particle_diam
+               # unit vector from centre to centre
+	       dij      = Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
+	       dij_unit = dij / sqrt( dij[1]^2 + dij[2]^2 )
+	       # projection of vi unto dij_unit
+	       proj_d_vi_magn = dot(velocities[i], dij_unit) / ( dij_unit[1]^2 + dij_unit[2]^2 ) # formally speaking
+               proj_d_vi      = proj_d_vi_magn * dij_unit
+	       if proj_d_vi_magn > 0
+		  ###   ELASTIC COLLISION
+		  # FIXME make momemtum exchange in the same cycle
+                  velocities[j] = Vec2f0( velocities[j][1] + proj_d_vi[1], velocities[j][2] + proj_d_vi[2])
+                  velocities[i] = Vec2f0( velocities[i][1] - proj_d_vi[1], velocities[i][2] - proj_d_vi[2])
+	       end
 	    end
-	    #push!(pair_check, (i, j))
 	end
 
         # Check for collisions with the walls and reverse velocity if needed
         if (positions[][i][1] - particle_diam[]/2) < 0 || (positions[][i][1] + particle_diam[]/2) > containerside
-           velocities[i] = Vec2f0( velocities[i][1] * (-1), velocities[i][2] )
+           velocities[i] = Vec2f0( -velocities[i][1], velocities[i][2] )
         end
         if (positions[][i][2] - particle_diam[]/2) < 0 || (positions[][i][2] + particle_diam[]/2) > containerside
-           velocities[i] = Vec2f0( velocities[i][1], velocities[i][2] * (-1) )
+           velocities[i] = Vec2f0( velocities[i][1], -velocities[i][2] )
         end
         # Update positions based on velocities
-        positions[][i] = Point2f0( positions[][i][1] + velocities[i][1], positions[][i][2] + velocities[i][2] )
+        positions[][i] = Point2f0( positions[][i][1] + dt * velocities[i][1], positions[][i][2] + dt * velocities[i][2] )
     end
 
     # Update the drawing
