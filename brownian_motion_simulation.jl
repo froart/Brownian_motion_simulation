@@ -5,7 +5,7 @@ function run_simulation()
     GLMakie.activate!()
     GLMakie.closeall()
 
-    num_particles = 10
+    num_particles = 30
     zoomframeside = Observable(0.4)
     containerside = 2 # cm
     particle_diam = 0.1 # cm
@@ -59,7 +59,7 @@ function run_simulation()
     pair_check_prev = []
 
     while !quit[] # simulation loop
-          step!(positions, velocities, pair_check_prev)
+          step!(positions, velocities, num_particles, pair_check_prev)
           notify(positions)
 
           # Calculate the cumulative velocity
@@ -91,7 +91,7 @@ function run_simulation()
     GLMakie.closeall()
 end
 
-function step!(positions, velocities, pair_check_prev)
+function step!(positions, velocities, num_particles, pair_check_prev)
 
     pair_check = []
     for i in 1:num_particles
