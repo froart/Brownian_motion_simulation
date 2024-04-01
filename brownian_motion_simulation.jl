@@ -33,6 +33,7 @@ function run_simulation()
     fig[2, 1] = grid2 = GridLayout()
     # Axis of speed bar plot
     ax2 = Axis(grid1[1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed))
+    xs = 1:num_particles
     # Velocity sum label
     label = Label(grid2[1, 1], "")
     # Escape button
@@ -54,8 +55,11 @@ function run_simulation()
 
     fps = 60
     frame_count = 0
+    display(fig)
+    pair_check_prev = []
+
     while !quit[] # simulation loop
-          step!(positions, velocities)
+          step!(positions, velocities, pair_check_prev)
           notify(positions)
 
           # Calculate the cumulative velocity
@@ -65,7 +69,7 @@ function run_simulation()
           end
           label.text = "Sum: $(tot_vel)"
 
-          ys = [ sqrt(velocities[i][1]^2 + velocities[i][2]^2) for i in 1:num_particles ]
+          ys = [ sqrt(velocities[i][1]^2 + velocities[i][2]^2) for i in xs ]
           empty!(ax2)
           barplot!(ax2, xs, ys, color = :blue)
 
@@ -80,7 +84,6 @@ function run_simulation()
           end
           =#
 
-          display(fig)
           sleep(1/fps)
           frame_count = frame_count + 1
     end
@@ -88,33 +91,34 @@ function run_simulation()
     GLMakie.closeall()
 end
 
-function step!(positions, velocities)
+function step!(positions, velocities, pair_check_prev)
 
     pair_check = []
     for i in 1:num_particles
-       # Check for collisions with other particles and exchange velocities if needed
-       for j in 1:num_particles
-           if j == i #=|| ((j, i) in pair_check)=# continue end
-           # if collision
-           if sqrt( ( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2 ) <= particle_diam
-              # unit vector from centre to centre
-              dij      = Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
-              dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
-              dji_unit = -dij_unit
-              # projection of vi & vj unto dij_unit & dji_unit accordingly
-              proj_d_vi_magn = dot(velocities[i], dij_unit) / ( dij_unit[1]^2 + dij_unit[2]^2 ) # formally speaking
-              proj_d_vi      = proj_d_vi_magn * dij_unit
-              proj_d_vj_magn = dot(velocities[j], dji_unit) / ( dji_unit[1]^2 + dji_unit[2]^2 ) # formally speaking
-              proj_d_vj      = proj_d_vj_magn * dji_unit
-              ###   ELASTIC COLLISION
-              velocities[j] = Vec2f0( velocities[j][1] + proj_d_vi[1] - proj_d_vj[1],
-                                      velocities[j][2] + proj_d_vi[2] - proj_d_vj[2] )
+        # Check for collisions with other particles and exchange velocities if needed
+        for j in 1:num_particles
+            # if the same particle or if we have already balanced the particular pair of particles in this step
+            if j == i || ((j, i) in pair_check) continue end
+            # if collision
+            if sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2) <= particle_diam && !((i, j) in pair_check_prev) && !((j, i) in pair_check_prev)
+               # unit vector from centre to centre
+               dij      = Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
+               dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
+               dji_unit = -dij_unit
+               # projection of vi & vj unto dij_unit & dji_unit accordingly
+               proj_d_vi_magn = dot(velocities[i], dij_unit) / ( dij_unit[1]^2 + dij_unit[2]^2 ) # formally speaking
+               proj_d_vi      = proj_d_vi_magn * dij_unit
+               proj_d_vj_magn = dot(velocities[j], dji_unit) / ( dji_unit[1]^2 + dji_unit[2]^2 ) # formally speaking
+               proj_d_vj      = proj_d_vj_magn * dji_unit
+               ###   ELASTIC COLLISION
+               velocities[j] = Vec2f0( velocities[j][1] + proj_d_vi[1] - proj_d_vj[1],
+                                       velocities[j][2] + proj_d_vi[2] - proj_d_vj[2] )
 
-              velocities[i] = Vec2f0( velocities[i][1] + proj_d_vj[1] - proj_d_vi[1],
-                                      velocities[i][2] + proj_d_vj[2] - proj_d_vi[2] )
-           end
-           push!(pair_check, (i, j))
-       end
+               velocities[i] = Vec2f0( velocities[i][1] + proj_d_vj[1] - proj_d_vi[1],
+                                       velocities[i][2] + proj_d_vj[2] - proj_d_vi[2] )
+               push!(pair_check, (i, j))
+            end
+        end
 
        # Check for collisions with the walls and reverse velocity if needed
        if (positions[][i][1] - particle_diam[]/2) < 0 || (positions[][i][1] + particle_diam[]/2) > containerside
@@ -128,7 +132,9 @@ function step!(positions, velocities)
        positions[][i] = Point2f0( positions[][i][1] + dt * velocities[i][1], positions[][i][2] + dt * velocities[i][2] )
 
     end
-
+  
     # Update the drawing
     scat[1][] = positions[]
+    empty!(pair_check_prev)
+    append!(pair_check_prev, pair_check)
 end
