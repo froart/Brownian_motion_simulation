@@ -25,17 +25,15 @@ function run_simulation()
     # Plot configuration
     fig = Figure(size = (600, 600))
     colsize!(fig.layout, 1, Relative(1))
-    fig[1, 1] = grid1 = GridLayout()
     # Axis of paticle box
-    ax  = Axis(grid1[1, 1], aspect = 1, limits = (0, containerside, 0, containerside))
+    ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, containerside, 0, containerside))
     hidexdecorations!(ax)
     hideydecorations!(ax)
-    fig[2, 1] = grid2 = GridLayout()
     # Axis of speed bar plot
-    ax2 = Axis(grid1[1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed))
+    ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed))
     xs = 1:num_particles
     # Velocity sum label
-    label = Label(grid2[1, 1], "")
+    label = Label(fig[2,1][1,2], "")
     # Escape button
     quit   = Observable(false)
     on(events(fig).keyboardbutton) do event
