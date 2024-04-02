@@ -7,8 +7,8 @@ function run_simulation()
 
     num_particles = 30
     zoomframeside = Observable(0.4)
-    containerside = 2 # cm
-    particle_diam = 0.1 # cm
+    containerside = 2
+    particle_diam = 0.1
     # FIX make scattered particles and axis of fixed sizes for real measure representation
     diam_for_scat = Observable( particle_diam * 270 )
     maxspeed      = 0.05
@@ -23,18 +23,18 @@ function run_simulation()
                            for _ in 1:num_particles ]
 
     # Plot configuration
-    fig = Figure(size = (600, 600))
-    colsize!(fig.layout, 1, Relative(1))
+    fig = Figure(size = (1200, 600))
+    # colsize!(fig.layout, 1, Relative(1))
     # Axis of paticle box
-    ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, containerside, 0, containerside))
+    ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, containerside, 0, containerside), width = 500, height = 500)
     hidexdecorations!(ax)
     hideydecorations!(ax)
     # Axis of speed bar plot
-    ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed))
+    ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed), width = 500, height = 500, subtitle = "")
     xs = 1:num_particles
     # Velocity sum label
-    label = Label(fig[2,1][1,2], "")
-    # Escape button
+    # label = Label(fig[1,1][1,2], "")
+    # ESC key
     quit   = Observable(false)
     on(events(fig).keyboardbutton) do event
        if event.action == Keyboard.press && event.key == Keyboard.escape
@@ -58,6 +58,7 @@ function run_simulation()
     pair_check_prev = []
 
     while !quit[] # simulation loop
+
           step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
           notify(positions)
 
@@ -66,7 +67,7 @@ function run_simulation()
           for i in 1:num_particles
               tot_vel = tot_vel + sqrt(velocities[i][1] ^ 2 + velocities[i][2] ^ 2 )
           end
-          label.text = "Sum: $(tot_vel)"
+          ax2.subtitle = "Cumulative velocity: $(tot_vel)"
 
           ys = [ sqrt(velocities[i][1]^2 + velocities[i][2]^2) for i in xs ]
           empty!(ax2)
@@ -101,7 +102,7 @@ function step!(positions, velocities, particle_diam, num_particles, containersid
             # if collision
             if sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2) <= particle_diam && !((i, j) in pair_check_prev) && !((j, i) in pair_check_prev)
                # unit vector from centre to centre
-               dij      = Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
+               dij      =  Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
                dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
                dji_unit = -dij_unit
                # projection of vi & vj unto dij_unit & dji_unit accordingly
