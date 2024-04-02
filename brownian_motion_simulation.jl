@@ -59,7 +59,6 @@ function run_simulation()
 
     while !quit[] # simulation loop
           step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
-          scat[1][] = positions[]
           notify(positions)
 
           # Calculate the cumulative velocity
