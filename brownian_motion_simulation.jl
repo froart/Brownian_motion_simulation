@@ -37,11 +37,12 @@ function run_simulation()
     # Velocity sum label
     label = Label(grid2[1, 1], "")
     # Escape button
-    button = grid2[1, 2] = Button(fig, label = "Exit")
     quit   = Observable(false)
-    on(button.clicks) do n
-       quit[] = true
-       notify(quit)
+    on(events(fig).keyboardbutton) do event
+       if event.action == Keyboard.press && event.key == Keyboard.escape
+          quit[] = true
+          notify(quit)
+       end
     end
     # Coordinates for the border
     xmin, xmax, ymin, ymax = 0, containerside, 0, containerside
@@ -59,7 +60,8 @@ function run_simulation()
     pair_check_prev = []
 
     while !quit[] # simulation loop
-          step!(positions, velocities, num_particles, pair_check_prev)
+          step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
+          scat[1][] = positions[]
           notify(positions)
 
           # Calculate the cumulative velocity
@@ -91,7 +93,7 @@ function run_simulation()
     GLMakie.closeall()
 end
 
-function step!(positions, velocities, num_particles, pair_check_prev)
+function step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
 
     pair_check = []
     for i in 1:num_particles
@@ -134,7 +136,6 @@ function step!(positions, velocities, num_particles, pair_check_prev)
     end
   
     # Update the drawing
-    scat[1][] = positions[]
     empty!(pair_check_prev)
     append!(pair_check_prev, pair_check)
 end
