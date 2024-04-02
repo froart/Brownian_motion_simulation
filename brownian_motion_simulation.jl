@@ -1,5 +1,52 @@
 using GLMakie, GeometryBasics, Observables, LinearAlgebra
 
+function step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
+
+    # FIX particle sticking issue is not yet resolved
+    # FIX cumulative velocity is "jumping", which it shouldn't
+    pair_check = []
+    for i in 1:num_particles
+        # Check for collisions with other particles and exchange velocities if needed
+        for j in 1:num_particles
+            # if the same particle or if we have already balanced the particular pair of particles in this step
+            if j == i || (j, i) in pair_check continue end
+            # if collision
+            if sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2) <= particle_diam && !((i, j) in pair_check_prev)
+               # unit vector from centre to centre
+               dij      =  Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
+               dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
+               dji_unit = -dij_unit
+               # projection of vi & vj unto dij_unit & dji_unit accordingly
+               proj_d_vi = dij_unit * dot(velocities[i], dij_unit) / ( dij_unit[1]^2 + dij_unit[2]^2 ) # formally speaking
+               proj_d_vj = dji_unit * dot(velocities[j], dji_unit) / ( dji_unit[1]^2 + dji_unit[2]^2 ) # formally speaking
+               ###   ELASTIC COLLISION
+               velocities[j] = Vec2f0( velocities[j][1] + proj_d_vi[1] - proj_d_vj[1],
+                                       velocities[j][2] + proj_d_vi[2] - proj_d_vj[2] )
+
+               velocities[i] = Vec2f0( velocities[i][1] + proj_d_vj[1] - proj_d_vi[1],
+                                       velocities[i][2] + proj_d_vj[2] - proj_d_vi[2] )
+               push!(pair_check, (i, j))
+            end
+        end
+
+       # Check for collisions with the walls and reverse velocity if needed
+       if (positions[][i][1] - particle_diam[]/2) < 0 || (positions[][i][1] + particle_diam[]/2) > containerside
+          velocities[i] = Vec2f0( -velocities[i][1], velocities[i][2] )
+       end
+       if (positions[][i][2] - particle_diam[]/2) < 0 || (positions[][i][2] + particle_diam[]/2) > containerside
+          velocities[i] = Vec2f0( velocities[i][1], -velocities[i][2] )
+       end
+
+       # Update positions based on velocities
+       positions[][i] = Point2f0( positions[][i][1] + dt * velocities[i][1], positions[][i][2] + dt * velocities[i][2] )
+
+    end
+  
+    # Update the drawing
+    empty!(pair_check_prev)
+    append!(pair_check_prev, pair_check)
+end
+
 function run_simulation()
 
     GLMakie.activate!()
@@ -32,10 +79,8 @@ function run_simulation()
     # Axis of speed bar plot
     ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed), width = 500, height = 500, subtitle = "")
     xs = 1:num_particles
-    # Velocity sum label
-    # label = Label(fig[1,1][1,2], "")
     # ESC key
-    quit   = Observable(false)
+    quit = Observable(false)
     on(events(fig).keyboardbutton) do event
        if event.action == Keyboard.press && event.key == Keyboard.escape
           quit[] = true
@@ -73,7 +118,7 @@ function run_simulation()
           empty!(ax2)
           barplot!(ax2, xs, ys, color = :blue)
 
-          #=
+          #= particle zoom in
           if frame_count > 520
              posx = positions[][1][1]
              posy = positions[][1][2]
@@ -91,49 +136,3 @@ function run_simulation()
     GLMakie.closeall()
 end
 
-function step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
-
-    pair_check = []
-    for i in 1:num_particles
-        # Check for collisions with other particles and exchange velocities if needed
-        for j in 1:num_particles
-            # if the same particle or if we have already balanced the particular pair of particles in this step
-            if j == i || ((j, i) in pair_check) continue end
-            # if collision
-            if sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2) <= particle_diam && !((i, j) in pair_check_prev) && !((j, i) in pair_check_prev)
-               # unit vector from centre to centre
-               dij      =  Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
-               dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
-               dji_unit = -dij_unit
-               # projection of vi & vj unto dij_unit & dji_unit accordingly
-               proj_d_vi_magn = dot(velocities[i], dij_unit) / ( dij_unit[1]^2 + dij_unit[2]^2 ) # formally speaking
-               proj_d_vi      = proj_d_vi_magn * dij_unit
-               proj_d_vj_magn = dot(velocities[j], dji_unit) / ( dji_unit[1]^2 + dji_unit[2]^2 ) # formally speaking
-               proj_d_vj      = proj_d_vj_magn * dji_unit
-               ###   ELASTIC COLLISION
-               velocities[j] = Vec2f0( velocities[j][1] + proj_d_vi[1] - proj_d_vj[1],
-                                       velocities[j][2] + proj_d_vi[2] - proj_d_vj[2] )
-
-               velocities[i] = Vec2f0( velocities[i][1] + proj_d_vj[1] - proj_d_vi[1],
-                                       velocities[i][2] + proj_d_vj[2] - proj_d_vi[2] )
-               push!(pair_check, (i, j))
-            end
-        end
-
-       # Check for collisions with the walls and reverse velocity if needed
-       if (positions[][i][1] - particle_diam[]/2) < 0 || (positions[][i][1] + particle_diam[]/2) > containerside
-          velocities[i] = Vec2f0( -velocities[i][1], velocities[i][2] )
-       end
-       if (positions[][i][2] - particle_diam[]/2) < 0 || (positions[][i][2] + particle_diam[]/2) > containerside
-          velocities[i] = Vec2f0( velocities[i][1], -velocities[i][2] )
-       end
-
-       # Update positions based on velocities
-       positions[][i] = Point2f0( positions[][i][1] + dt * velocities[i][1], positions[][i][2] + dt * velocities[i][2] )
-
-    end
-  
-    # Update the drawing
-    empty!(pair_check_prev)
-    append!(pair_check_prev, pair_check)
-end
