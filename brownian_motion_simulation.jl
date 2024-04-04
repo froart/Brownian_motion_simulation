@@ -1,17 +1,15 @@
 using GLMakie, GeometryBasics, Observables, LinearAlgebra
 
-function step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
+function step!(positions, velocities, particle_diam, num_particles, containerside, dt, already_collided)
 
     # FIX particle sticking issue is not yet resolved
     # FIX cumulative velocity is "jumping", which it shouldn't
-    pair_check = []
     for i in 1:num_particles
         # Check for collisions with other particles and exchange velocities if needed
-        for j in 1:num_particles
-            # if the same particle or if we have already balanced the particular pair of particles in this step
-            if j == i || (j, i) in pair_check continue end
+        for j in (i+1):num_particles
             # if collision
-            if sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2) <= particle_diam && !((i, j) in pair_check_prev)
+            dist = sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2)
+            if dist <= particle_diam && already_collided[i,j] == false 
                # unit vector from centre to centre
                dij      =  Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
                dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
@@ -25,7 +23,11 @@ function step!(positions, velocities, particle_diam, num_particles, containersid
 
                velocities[i] = Vec2f0( velocities[i][1] + proj_d_vj[1] - proj_d_vi[1],
                                        velocities[i][2] + proj_d_vj[2] - proj_d_vi[2] )
-               push!(pair_check, (i, j))
+               already_collided[i,j] = true
+            end
+
+            if dist > particle_diam && already_collided[i,j] == true
+               already_collided[i,j] = false
             end
         end
 
@@ -41,10 +43,6 @@ function step!(positions, velocities, particle_diam, num_particles, containersid
        positions[][i] = Point2f0( positions[][i][1] + dt * velocities[i][1], positions[][i][2] + dt * velocities[i][2] )
 
     end
-  
-    # Update the drawing
-    empty!(pair_check_prev)
-    append!(pair_check_prev, pair_check)
 end
 
 function run_simulation()
@@ -77,7 +75,7 @@ function run_simulation()
     hidexdecorations!(ax)
     hideydecorations!(ax)
     # Axis of speed bar plot
-    ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed), width = 500, height = 500, subtitle = "")
+    ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, maxspeed), width = 500, height = 500, xlabel = "Velocity of each particle")
     xs = 1:num_particles
     # ESC key
     quit = Observable(false)
@@ -100,11 +98,11 @@ function run_simulation()
     fps = 60
     frame_count = 0
     display(fig)
-    pair_check_prev = []
+    already_collided = falses(num_particles, num_particles)
 
     while !quit[] # simulation loop
 
-          step!(positions, velocities, particle_diam, num_particles, containerside, dt, pair_check_prev)
+          step!(positions, velocities, particle_diam, num_particles, containerside, dt, already_collided)
           notify(positions)
 
           # Calculate the cumulative velocity
@@ -117,17 +115,6 @@ function run_simulation()
           ys = [ sqrt(velocities[i][1]^2 + velocities[i][2]^2) for i in xs ]
           empty!(ax2)
           barplot!(ax2, xs, ys, color = :blue)
-
-          #= particle zoom in
-          if frame_count > 520
-             posx = positions[][1][1]
-             posy = positions[][1][2]
-             limits!(ax, posx - zoomframeside[]/2, posx + zoomframeside[]/2, posy - zoomframeside[]/2, posy + zoomframeside[]/2)
-          end
-          if frame_count == 521
-             global diam_for_scat[] = diam_for_scat[] * containerside / zoomframeside[] 
-          end
-          =#
 
           sleep(1/fps)
           frame_count = frame_count + 1
