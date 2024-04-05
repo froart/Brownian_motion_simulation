@@ -6,8 +6,9 @@ function step!(positions, velocities, particle_diam, num_particles, containersid
     for i in 1:num_particles
         # Check for collisions with other particles and exchange velocities if needed
         for j in (i+1):num_particles
-            # if collision
             dist = sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2)
+      
+            # if collision
             if dist <= particle_diam && already_collided[i,j] == false 
                # unit vector from centre to centre
                dij      =  Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
