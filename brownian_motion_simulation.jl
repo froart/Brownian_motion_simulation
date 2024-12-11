@@ -1,5 +1,29 @@
 using GLMakie, GeometryBasics, Observables, LinearAlgebra, Distributions
 
+# TODO make values to be depicted precisely in cm, m, etc on the screen
+# TODO create function draw and zoom, which would draw objects on the screen 
+
+mutable struct Particles
+   rad::Float64
+   num::Int64
+   pos::Observable{Vector{Point2f0}}
+   vel::Vector{Vec2f0}
+   collided::Array{Bool, 2}
+
+   function Particles(rad::Float64, num::Int64, boundaries::@NamedTuple{xmin::Int64, xmax::Int64, ymin::Int64, ymax::Int64}, maxspeed::Float64)
+      @assert rad > 0 "Radius must be positive"
+      @assert num > 0 "Number of particles must be positive"
+      pos = Observable([Point2f0(rand(Uniform(boundaries[:xmin] + rad, boundaries[:xmax] - rad)), 
+                                 rand(Uniform(boundaries[:ymin] + rad, boundaries[:ymax] - rad)))
+                        for i in 1:num])
+      vel = [Vec2f0(rand(Uniform(0, maxspeed)), 
+                    rand(Uniform(0, maxspeed)))
+             for i in 1:num]
+      col = falses(num, num + 4)
+      return new(rad, num, pos, vel, col)
+   end
+end
+
 function step!(positions, velocities, particle_diam, num_particles, containerside, dt, already_collided, walls_coord)
 
     # FIX cumulative velocity is "jumping", which it shouldn't
@@ -86,11 +110,14 @@ dt            = 1
 # Coordinates for the border
 walls_coord = ( xmin = 0, xmax = containerside, ymin = 0, ymax = containerside)
 
+particles = Particles(particle_diam/2, num_particles, walls_coord, maxspeed)
+
 # Define initial positions and velocities for the particles
 positions  = Observable([ Point2f0( 
                         rand(Uniform(walls_coord[:xmin] + particle_diam/2, walls_coord[:xmax] - particle_diam/2)), 
                         rand(Uniform(walls_coord[:ymin] + particle_diam/2, walls_coord[:ymax] - particle_diam/2)))
                                  for _ in 1:num_particles ])
+# TODO make it using Uniform from 0 to maxspeed
 velocities = [ Vec2f0( maxspeed * rand() * rand([-1,1]), 
                         maxspeed * rand() * rand([-1,1])) 
                      for _ in 1:num_particles ]
