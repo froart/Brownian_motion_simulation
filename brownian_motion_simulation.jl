@@ -2,6 +2,7 @@ using GLMakie, GeometryBasics, Observables, LinearAlgebra, Distributions
 
 # TODO make values to be depicted precisely in cm, m, etc on the screen
 # TODO create function draw and zoom, which would draw objects on the screen 
+# TODO make structure for solid objects
 
 mutable struct Particles
    rad::Float64
@@ -9,129 +10,121 @@ mutable struct Particles
    pos::Observable{Array{Point2f0, 1}}
    vel::Array{Vec2f0, 1}
    collided::Array{Bool, 2}
-
-   function Particles(rad::Float64, num::Int64, boundaries::@NamedTuple{xmin::Float64, xmax::Float64, ymin::Float64, ymax::Float64}, maxspeed::Float64)
+   # Constructor
+   function Particles(rad::Float64, num::Int64, boundaries::@NamedTuple{x_min::Float64, x_max::Float64, y_min::Float64, y_max::Float64}, maxspeed::Float64)
       @assert rad > 0 "Radius must be positive"
       @assert num > 0 "Number of particles must be positive"
-      pos = Observable([Point2f0(rand(Uniform(boundaries[:xmin] + rad, boundaries[:xmax] - rad)), 
-                                 rand(Uniform(boundaries[:ymin] + rad, boundaries[:ymax] - rad)))
+      pos = Observable([Point2f0(rand(Uniform(boundaries[:x_min] + rad, boundaries[:x_max] - rad)), 
+                                 rand(Uniform(boundaries[:y_min] + rad, boundaries[:y_max] - rad)))
                         for i in 1:num])
-      vel = [Vec2f0(rand(Uniform(0, maxspeed)), 
-                    rand(Uniform(0, maxspeed)))
+      vel = [Vec2f0(rand(Uniform(-maxspeed, maxspeed)), 
+                    rand(Uniform(-maxspeed, maxspeed)))
              for i in 1:num]
       col = falses(num, num + 4)
       return new(rad, num, pos, vel, col)
    end
 end
 
-function step!(positions, velocities, particle_diam, num_particles, containerside, dt, already_collided, walls_coord)
+function step!(pts::Particles, dt::Float64, walls_coord::@NamedTuple{x_min::Float64, x_max::Float64, y_min::Float64, y_max::Float64})
 
     # FIX cumulative velocity is "jumping", which it shouldn't
-    for i in 1:num_particles
+    for i in 1:pts.num
         # Check for collisions with other particles and exchange velocities if needed
-        for j in (i+1):num_particles
-            dist = sqrt(( positions[][j][1] - positions[][i][1] )^2 + ( positions[][j][2] - positions[][i][2] )^2)
+        for j in (i+1):pts.num
+            dist = sqrt((pts.pos[][j][1] - pts.pos[][i][1])^2 + (pts.pos[][j][2] - pts.pos[][i][2])^2)
       
             # if collision
-            if dist <= particle_diam && already_collided[i,j] == false 
+            if dist <= 2pts.rad && pts.collided[i,j] == false 
                # unit vector from centre to centre
-               dij      =  Vec2f0( positions[][j][1] - positions[][i][1], positions[][j][2] - positions[][i][2] )
+               dij      =  Vec2f0( pts.pos[][j][1] - pts.pos[][i][1], pts.pos[][j][2] - pts.pos[][i][2] )
                dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
                dji_unit = -dij_unit
                # projection of vi & vj unto dij_unit & dji_unit accordingly
-               proj_d_vi = dij_unit * dot(velocities[i], dij_unit) / ( dij_unit[1]^2 + dij_unit[2]^2 ) # formally speaking
-               proj_d_vj = dji_unit * dot(velocities[j], dji_unit) / ( dji_unit[1]^2 + dji_unit[2]^2 ) # formally speaking
+               proj_d_vi = dij_unit * dot(pts.vel[i], dij_unit) / ( dij_unit[1]^2 + dij_unit[2]^2 ) # formally speaking
+               proj_d_vj = dji_unit * dot(pts.vel[j], dji_unit) / ( dji_unit[1]^2 + dji_unit[2]^2 ) # formally speaking
                ###   ELASTIC COLLISION
-               velocities[j] = Vec2f0( velocities[j][1] + proj_d_vi[1] - proj_d_vj[1],
-                                       velocities[j][2] + proj_d_vi[2] - proj_d_vj[2] )
+               pts.vel[j] = Vec2f0( pts.vel[j][1] + proj_d_vi[1] - proj_d_vj[1],
+                                       pts.vel[j][2] + proj_d_vi[2] - proj_d_vj[2] )
 
-               velocities[i] = Vec2f0( velocities[i][1] + proj_d_vj[1] - proj_d_vi[1],
-                                       velocities[i][2] + proj_d_vj[2] - proj_d_vi[2] )
-               already_collided[i,j] = true
+               pts.vel[i] = Vec2f0( pts.vel[i][1] + proj_d_vj[1] - proj_d_vi[1],
+                                       pts.vel[i][2] + proj_d_vj[2] - proj_d_vi[2] )
+               pts.collided[i,j] = true
             end
 
-            # if a particle escape another particle
-            if dist > particle_diam && already_collided[i,j] == true
-               already_collided[i,j] = false
+            # When a particle escape another particle
+            if dist > 2pts.rad && pts.collided[i,j] == true
+               pts.collided[i,j] = false
             end
         end
 
        # Check for collisions with the walls and reverse velocity if needed
        # Left
-       if (positions[][i][1] - particle_diam[]/2) <= walls_coord[:xmin] && already_collided[i, num_particles+1] == false
-          velocities[i] = Vec2f0( -velocities[i][1], velocities[i][2] )
-          already_collided[i, num_particles+1] = true
+       if (pts.pos[][i][1] - pts.rad) <= walls_coord[:x_min] && pts.collided[i, pts.num+1] == false
+          pts.vel[i] = Vec2f0( -pts.vel[i][1], pts.vel[i][2] )
+          pts.collided[i, pts.num+1] = true
        end
-       if (positions[][i][1] - particle_diam[]/2) > walls_coord[:xmin] && already_collided[i, num_particles+1] == true
-          already_collided[i, num_particles+1] = false
+       if (pts.pos[][i][1] - pts.rad) > walls_coord[:x_min] && pts.collided[i, pts.num+1] == true
+          pts.collided[i, pts.num+1] = false
        end
        # Right
-       if (positions[][i][1] + particle_diam[]/2) >= walls_coord[:xmax] && already_collided[i, num_particles+2] == false
-          velocities[i] = Vec2f0( -velocities[i][1], velocities[i][2] )
-          already_collided[i, num_particles+2] = true
+       if (pts.pos[][i][1] + pts.rad) >= walls_coord[:x_max] && pts.collided[i, pts.num+2] == false
+          pts.vel[i] = Vec2f0( -pts.vel[i][1], pts.vel[i][2] )
+          pts.collided[i, pts.num+2] = true
        end
-       if (positions[][i][1] + particle_diam[]/2) < walls_coord[:xmax] && already_collided[i, num_particles+2] == true
-          already_collided[i, num_particles+2] = false
+       if (pts.pos[][i][1] + pts.rad) < walls_coord[:x_max] && pts.collided[i, pts.num+2] == true
+          pts.collided[i, pts.num+2] = false
        end
        # Bottom
-       if (positions[][i][2] - particle_diam[]/2) <= walls_coord[:ymin] && already_collided[i, num_particles+3] == false
-          velocities[i] = Vec2f0( velocities[i][1], -velocities[i][2] )
-          already_collided[i, num_particles+3] = true
+       if (pts.pos[][i][2] - pts.rad) <= walls_coord[:y_min] && pts.collided[i, pts.num+3] == false
+          pts.vel[i] = Vec2f0( pts.vel[i][1], -pts.vel[i][2] )
+          pts.collided[i, pts.num+3] = true
        end
-       if (positions[][i][2] - particle_diam[]/2) > walls_coord[:ymin] && already_collided[i, num_particles+3] == true
-          already_collided[i, num_particles+3] = false
+       if (pts.pos[][i][2] - pts.rad) > walls_coord[:y_min] && pts.collided[i, pts.num+3] == true
+          pts.collided[i, pts.num+3] = false
        end
        # Upper
-       if (positions[][i][2] + particle_diam[]/2) >= walls_coord[:ymax] && already_collided[i, num_particles+4] == false
-          velocities[i] = Vec2f0( velocities[i][1], -velocities[i][2] )
-          already_collided[i, num_particles+4] = true
+       if (pts.pos[][i][2] + pts.rad) >= walls_coord[:y_max] && pts.collided[i, pts.num+4] == false
+          pts.vel[i] = Vec2f0( pts.vel[i][1], -pts.vel[i][2] )
+          pts.collided[i, pts.num+4] = true
        end
-       if (positions[][i][2] + particle_diam[]/2) < walls_coord[:ymax] && already_collided[i, num_particles+4] == true
-          already_collided[i, num_particles+4] = false
+       if (pts.pos[][i][2] + pts.rad) < walls_coord[:y_max] && pts.collided[i, pts.num+4] == true
+          pts.collided[i, pts.num+4] = false
        end
 
        # Update positions based on velocities
-       positions[][i] = Point2f0( positions[][i][1] + dt * velocities[i][1], positions[][i][2] + dt * velocities[i][2] )
+       pts.pos[][i] = Point2f0( pts.pos[][i][1] + dt * pts.vel[i][1], pts.pos[][i][2] + dt * pts.vel[i][2] )
 
     end
 end
 
+# Configuring GLMakie
 GLMakie.activate!()
 GLMakie.closeall()
 
-num_particles = 30
-zoomframeside = Observable(0.4)
-containerside = 2.0
-particle_diam = 0.1
-# FIX make scattered particles and axis of fixed sizes for real measure representation
-diam_for_scat = Observable( particle_diam * 270 )
-maxspeed      = 0.05
-dt            = 1
+# Defining parameters of the simulation
+container_side  = 2.0
+particle_radius = 0.05
+particles_num   = 30
+speed_max       = 0.05
+dt              = 1.0
+diam_for_scat   = 25.0
+
 # Coordinates for the border
-walls_coord = ( xmin = 0.0, xmax = containerside, ymin = 0.0, ymax = containerside)
+walls_coord = ( x_min = 0.0, x_max = container_side, y_min = 0.0, y_max = container_side)
 
-particles = Particles(particle_diam/2, num_particles, walls_coord, maxspeed)
-
-# Define initial positions and velocities for the particles
-positions  = Observable([ Point2f0( 
-                        rand(Uniform(walls_coord[:xmin] + particle_diam/2, walls_coord[:xmax] - particle_diam/2)), 
-                        rand(Uniform(walls_coord[:ymin] + particle_diam/2, walls_coord[:ymax] - particle_diam/2)))
-                                 for _ in 1:num_particles ])
-
-velocities = [ Vec2f0( maxspeed * rand() * rand([-1,1]), 
-                        maxspeed * rand() * rand([-1,1])) 
-                     for _ in 1:num_particles ]
+# Generating particles
+pts = Particles(particle_radius, particles_num, walls_coord, speed_max)
 
 # Plot configuration
 fig = Figure(size = (1200, 600))
 # colsize!(fig.layout, 1, Relative(1))
 # Axis of paticle box
-ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, containerside, 0, containerside), width = 500, height = 500)
+ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, container_side, 0, container_side), width = 500, height = 500)
 hidexdecorations!(ax)
 hideydecorations!(ax)
 # Axis of speed bar plot
-ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, 2.0maxspeed), width = 500, height = 500, xlabel = "Velocity of each particle")
-xs = 1:num_particles
+ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, particles_num + 1, 0, 2.0speed_max), width = 500, height = 500, xlabel = "Velocity of each particle")
+xs = 1:particles_num
 # ESC key
 quit = Observable(false)
 on(events(fig).keyboardbutton) do event
@@ -142,27 +135,26 @@ on(events(fig).keyboardbutton) do event
 end
 # Draw lines to form a border
 # Bottom
-lines!(ax, [walls_coord[:xmin], walls_coord[:xmax]], [walls_coord[:ymin], walls_coord[:ymin]], color=:black, linewidth = 8 )
+lines!(ax, [walls_coord[:x_min], walls_coord[:x_max]], [walls_coord[:y_min], walls_coord[:y_min]], color=:black, linewidth = 8 )
 # Top
-lines!(ax, [walls_coord[:xmin], walls_coord[:xmax]], [walls_coord[:ymax], walls_coord[:ymax]], color=:black, linewidth = 8 )
+lines!(ax, [walls_coord[:x_min], walls_coord[:x_max]], [walls_coord[:y_max], walls_coord[:y_max]], color=:black, linewidth = 8 )
 # Left
-lines!(ax, [walls_coord[:xmin], walls_coord[:xmin]], [walls_coord[:ymin], walls_coord[:ymax]], color=:black, linewidth = 8 )
+lines!(ax, [walls_coord[:x_min], walls_coord[:x_min]], [walls_coord[:y_min], walls_coord[:y_max]], color=:black, linewidth = 8 )
 # Right
-lines!(ax, [walls_coord[:xmax], walls_coord[:xmax]], [walls_coord[:ymin], walls_coord[:ymax]], color=:black, linewidth = 8 )
+lines!(ax, [walls_coord[:x_max], walls_coord[:x_max]], [walls_coord[:y_min], walls_coord[:y_max]], color=:black, linewidth = 8 )
 # Draw particles
-scat = scatter!(ax, positions, markersize = diam_for_scat)
+scat = scatter!(ax, pts.pos, markersize = diam_for_scat)
 
 fps = 60
 frame_count = 0
 display(fig)
-already_collided = falses(num_particles, num_particles+4)
 
 while !quit[] # simulation loop
 
-      step!(positions, velocities, particle_diam, num_particles, containerside, dt, already_collided, walls_coord)
-      notify(positions)
+      step!(pts, dt, walls_coord)
+      notify(pts.pos)
 
-      ys = [ sqrt(velocities[i][1]^2 + velocities[i][2]^2) for i in xs ]
+      ys = [ sqrt(pts.vel[i][1]^2 + pts.vel[i][2]^2) for i in xs ]
       empty!(ax2)
       barplot!(ax2, xs, ys, color = :blue)
 
