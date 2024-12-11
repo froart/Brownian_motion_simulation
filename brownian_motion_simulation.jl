@@ -4,6 +4,13 @@ using GLMakie, GeometryBasics, Observables, LinearAlgebra, Distributions
 # TODO create function draw and zoom, which would draw objects on the screen 
 # TODO make structure for solid objects
 
+mutable struct Container
+   x_min::Float64
+   x_max::Float64
+   y_min::Float64
+   y_max::Float64
+end
+
 mutable struct Particles
    rad::Float64
    num::Int64
@@ -11,11 +18,11 @@ mutable struct Particles
    vel::Array{Vec2f0, 1}
    collided::Array{Bool, 2}
    # Constructor
-   function Particles(rad::Float64, num::Int64, boundaries::@NamedTuple{x_min::Float64, x_max::Float64, y_min::Float64, y_max::Float64}, maxspeed::Float64)
+   function Particles(rad::Float64, num::Int64, boundaries::Container, maxspeed::Float64)
       @assert rad > 0 "Radius must be positive"
       @assert num > 0 "Number of particles must be positive"
-      pos = Observable([Point2f0(rand(Uniform(boundaries[:x_min] + rad, boundaries[:x_max] - rad)), 
-                                 rand(Uniform(boundaries[:y_min] + rad, boundaries[:y_max] - rad)))
+      pos = Observable([Point2f0(rand(Uniform(boundaries.x_min + rad, boundaries.x_max - rad)), 
+                                 rand(Uniform(boundaries.y_min + rad, boundaries.y_max - rad)))
                         for i in 1:num])
       vel = [Vec2f0(rand(Uniform(-maxspeed, maxspeed)), 
                     rand(Uniform(-maxspeed, maxspeed)))
@@ -25,7 +32,7 @@ mutable struct Particles
    end
 end
 
-function step!(pts::Particles, dt::Float64, walls_coord::@NamedTuple{x_min::Float64, x_max::Float64, y_min::Float64, y_max::Float64})
+function step!(pts::Particles, container::Container, dt::Float64)
 
     # FIX cumulative velocity is "jumping", which it shouldn't
     for i in 1:pts.num
@@ -59,35 +66,35 @@ function step!(pts::Particles, dt::Float64, walls_coord::@NamedTuple{x_min::Floa
 
        # Check for collisions with the walls and reverse velocity if needed
        # Left
-       if (pts.pos[][i][1] - pts.rad) <= walls_coord[:x_min] && pts.collided[i, pts.num+1] == false
+       if (pts.pos[][i][1] - pts.rad) <= container.x_min && pts.collided[i, pts.num+1] == false
           pts.vel[i] = Vec2f0( -pts.vel[i][1], pts.vel[i][2] )
           pts.collided[i, pts.num+1] = true
        end
-       if (pts.pos[][i][1] - pts.rad) > walls_coord[:x_min] && pts.collided[i, pts.num+1] == true
+       if (pts.pos[][i][1] - pts.rad) > container.x_min && pts.collided[i, pts.num+1] == true
           pts.collided[i, pts.num+1] = false
        end
        # Right
-       if (pts.pos[][i][1] + pts.rad) >= walls_coord[:x_max] && pts.collided[i, pts.num+2] == false
+       if (pts.pos[][i][1] + pts.rad) >= container.x_max && pts.collided[i, pts.num+2] == false
           pts.vel[i] = Vec2f0( -pts.vel[i][1], pts.vel[i][2] )
           pts.collided[i, pts.num+2] = true
        end
-       if (pts.pos[][i][1] + pts.rad) < walls_coord[:x_max] && pts.collided[i, pts.num+2] == true
+       if (pts.pos[][i][1] + pts.rad) < container.x_max && pts.collided[i, pts.num+2] == true
           pts.collided[i, pts.num+2] = false
        end
        # Bottom
-       if (pts.pos[][i][2] - pts.rad) <= walls_coord[:y_min] && pts.collided[i, pts.num+3] == false
+       if (pts.pos[][i][2] - pts.rad) <= container.y_min && pts.collided[i, pts.num+3] == false
           pts.vel[i] = Vec2f0( pts.vel[i][1], -pts.vel[i][2] )
           pts.collided[i, pts.num+3] = true
        end
-       if (pts.pos[][i][2] - pts.rad) > walls_coord[:y_min] && pts.collided[i, pts.num+3] == true
+       if (pts.pos[][i][2] - pts.rad) > container.y_min && pts.collided[i, pts.num+3] == true
           pts.collided[i, pts.num+3] = false
        end
        # Upper
-       if (pts.pos[][i][2] + pts.rad) >= walls_coord[:y_max] && pts.collided[i, pts.num+4] == false
+       if (pts.pos[][i][2] + pts.rad) >= container.y_max && pts.collided[i, pts.num+4] == false
           pts.vel[i] = Vec2f0( pts.vel[i][1], -pts.vel[i][2] )
           pts.collided[i, pts.num+4] = true
        end
-       if (pts.pos[][i][2] + pts.rad) < walls_coord[:y_max] && pts.collided[i, pts.num+4] == true
+       if (pts.pos[][i][2] + pts.rad) < container.y_max && pts.collided[i, pts.num+4] == true
           pts.collided[i, pts.num+4] = false
        end
 
@@ -102,7 +109,6 @@ GLMakie.activate!()
 GLMakie.closeall()
 
 # Defining parameters of the simulation
-container_side  = 2.0
 particle_radius = 0.05
 particles_num   = 30
 speed_max       = 0.05
@@ -110,16 +116,16 @@ dt              = 1.0
 diam_for_scat   = 25.0
 
 # Coordinates for the border
-walls_coord = ( x_min = 0.0, x_max = container_side, y_min = 0.0, y_max = container_side)
+container = Container(0.0, 2.0, 0.0, 2.0)
 
 # Generating particles
-pts = Particles(particle_radius, particles_num, walls_coord, speed_max)
+pts = Particles(particle_radius, particles_num, container, speed_max)
 
 # Plot configuration
 fig = Figure(size = (1200, 600))
 # colsize!(fig.layout, 1, Relative(1))
 # Axis of paticle box
-ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, container_side, 0, container_side), width = 500, height = 500)
+ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (container.x_min, container.x_max, container.y_min, container.y_max), width = 500, height = 500)
 hidexdecorations!(ax)
 hideydecorations!(ax)
 # Axis of speed bar plot
@@ -135,13 +141,13 @@ on(events(fig).keyboardbutton) do event
 end
 # Draw lines to form a border
 # Bottom
-lines!(ax, [walls_coord[:x_min], walls_coord[:x_max]], [walls_coord[:y_min], walls_coord[:y_min]], color=:black, linewidth = 8 )
+lines!(ax, [container.x_min, container.x_max], [container.y_min, container.y_min], color=:black, linewidth = 8 )
 # Top
-lines!(ax, [walls_coord[:x_min], walls_coord[:x_max]], [walls_coord[:y_max], walls_coord[:y_max]], color=:black, linewidth = 8 )
+lines!(ax, [container.x_min, container.x_max], [container.y_max, container.y_max], color=:black, linewidth = 8 )
 # Left
-lines!(ax, [walls_coord[:x_min], walls_coord[:x_min]], [walls_coord[:y_min], walls_coord[:y_max]], color=:black, linewidth = 8 )
+lines!(ax, [container.x_min, container.x_min], [container.y_min, container.y_max], color=:black, linewidth = 8 )
 # Right
-lines!(ax, [walls_coord[:x_max], walls_coord[:x_max]], [walls_coord[:y_min], walls_coord[:y_max]], color=:black, linewidth = 8 )
+lines!(ax, [container.x_max, container.x_max], [container.y_min, container.y_max], color=:black, linewidth = 8 )
 # Draw particles
 scat = scatter!(ax, pts.pos, markersize = diam_for_scat)
 
@@ -151,7 +157,7 @@ display(fig)
 
 while !quit[] # simulation loop
 
-      step!(pts, dt, walls_coord)
+      step!(pts, container, dt)
       notify(pts.pos)
 
       ys = [ sqrt(pts.vel[i][1]^2 + pts.vel[i][2]^2) for i in xs ]
