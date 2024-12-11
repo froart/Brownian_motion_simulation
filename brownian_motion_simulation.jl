@@ -34,7 +34,7 @@ end
 
 function step!(pts::Particles, container::Container, dt::Float64)
 
-    # FIX cumulative velocity is "jumping", which it shouldn't
+    # FIXME cumulative velocity is "jumping", which it shouldn't
     for i in 1:pts.num
         # Check for collisions with other particles and exchange velocities if needed
         for j in (i+1):pts.num
@@ -109,14 +109,14 @@ GLMakie.activate!()
 GLMakie.closeall()
 
 # Defining parameters of the simulation
-particle_radius = 0.05
 particles_num   = 30
-speed_max       = 0.05
-dt              = 1.0
-diam_for_scat   = 25.0
-
-# Coordinates for the border
-container = Container(0.0, 2.0, 0.0, 2.0)
+speed_max       = 0.5 # (m/s)
+dt              = 1.0 # (s)
+particle_radius = 1.0 # (cm)
+dpi = sqrt(1920^2 + 1080^2) / 15.6 # should be fixed with each new monitor
+particle_radius_pxs = (particle_radius / 2.54) * dpi
+# Coordinates for the borders
+container = Container(0.0, 20.0, 0.0, 20.0)
 
 # Generating particles
 pts = Particles(particle_radius, particles_num, container, speed_max)
@@ -149,7 +149,7 @@ lines!(ax, [container.x_min, container.x_min], [container.y_min, container.y_max
 # Right
 lines!(ax, [container.x_max, container.x_max], [container.y_min, container.y_max], color=:black, linewidth = 8 )
 # Draw particles
-scat = scatter!(ax, pts.pos, markersize = diam_for_scat)
+scat = scatter!(ax, pts.pos, markersize = particle_radius_pxs)
 
 fps = 60
 frame_count = 0
