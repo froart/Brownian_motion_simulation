@@ -72,82 +72,79 @@ function step!(positions, velocities, particle_diam, num_particles, containersid
     end
 end
 
-function run_simulation()
+GLMakie.activate!()
+GLMakie.closeall()
 
-    GLMakie.activate!()
-    GLMakie.closeall()
+num_particles = 30
+zoomframeside = Observable(0.4)
+containerside = 2
+particle_diam = 0.1
+# FIX make scattered particles and axis of fixed sizes for real measure representation
+diam_for_scat = Observable( particle_diam * 270 )
+maxspeed      = 0.05
+dt            = 1
+# Coordinates for the border
+walls_coord = ( xmin = 0, xmax = containerside, ymin = 0, ymax = containerside)
 
-    num_particles = 30
-    zoomframeside = Observable(0.4)
-    containerside = 2
-    particle_diam = 0.1
-    # FIX make scattered particles and axis of fixed sizes for real measure representation
-    diam_for_scat = Observable( particle_diam * 270 )
-    maxspeed      = 0.05
-    dt            = 1
-    # Coordinates for the border
-    walls_coord = ( xmin = 0, xmax = containerside, ymin = 0, ymax = containerside)
+# Define initial positions and velocities for the particles
+positions  = Observable([ Point2f0( 
+                        rand(Uniform(walls_coord[:xmin] + particle_diam/2, walls_coord[:xmax] - particle_diam/2)), 
+                        rand(Uniform(walls_coord[:ymin] + particle_diam/2, walls_coord[:ymax] - particle_diam/2)))
+                                 for _ in 1:num_particles ])
+velocities = [ Vec2f0( maxspeed * rand() * rand([-1,1]), 
+                        maxspeed * rand() * rand([-1,1])) 
+                     for _ in 1:num_particles ]
 
-    # Define initial positions and velocities for the particles
-    positions  = Observable([ Point2f0( 
-                              rand(Uniform(walls_coord[:xmin] + particle_diam/2, walls_coord[:xmax] - particle_diam/2)), 
-                              rand(Uniform(walls_coord[:ymin] + particle_diam/2, walls_coord[:ymax] - particle_diam/2)))
-		                               for _ in 1:num_particles ])
-    velocities = [ Vec2f0( maxspeed * rand() * rand([-1,1]), 
-	                         maxspeed * rand() * rand([-1,1])) 
-                           for _ in 1:num_particles ]
-
-    # Plot configuration
-    fig = Figure(size = (1200, 600))
-    # colsize!(fig.layout, 1, Relative(1))
-    # Axis of paticle box
-    ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, containerside, 0, containerside), width = 500, height = 500)
-    hidexdecorations!(ax)
-    hideydecorations!(ax)
-    # Axis of speed bar plot
-    ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, 2.0maxspeed), width = 500, height = 500, xlabel = "Velocity of each particle")
-    xs = 1:num_particles
-    # ESC key
-    quit = Observable(false)
-    on(events(fig).keyboardbutton) do event
-       if event.action == Keyboard.press && event.key == Keyboard.escape
-          quit[] = true
-          notify(quit)
-       end
-    end
-    # Draw lines to form a border
-    # Bottom
-    lines!(ax, [walls_coord[:xmin], walls_coord[:xmax]], [walls_coord[:ymin], walls_coord[:ymin]], color=:black, linewidth = 8 )
-    # Top
-    lines!(ax, [walls_coord[:xmin], walls_coord[:xmax]], [walls_coord[:ymax], walls_coord[:ymax]], color=:black, linewidth = 8 )
-    # Left
-    lines!(ax, [walls_coord[:xmin], walls_coord[:xmin]], [walls_coord[:ymin], walls_coord[:ymax]], color=:black, linewidth = 8 )
-    # Right
-    lines!(ax, [walls_coord[:xmax], walls_coord[:xmax]], [walls_coord[:ymin], walls_coord[:ymax]], color=:black, linewidth = 8 )
-    # Draw particles
-    scat = scatter!(ax, positions, markersize = diam_for_scat)
-
-    fps = 60
-    frame_count = 0
-    display(fig)
-    already_collided = falses(num_particles, num_particles+4)
-
-    while !quit[] # simulation loop
-
-          step!(positions, velocities, particle_diam, num_particles, containerside, dt, already_collided, walls_coord)
-          notify(positions)
-
-          ys = [ sqrt(velocities[i][1]^2 + velocities[i][2]^2) for i in xs ]
-          empty!(ax2)
-          barplot!(ax2, xs, ys, color = :blue)
-
-          # Calculate the cumulative velocity
-          ax2.subtitle = "Cumulative velocity: $(sum(ys))"
-
-          sleep(1/fps)
-          frame_count = frame_count + 1
-    end
-
-    GLMakie.closeall()
+# Plot configuration
+fig = Figure(size = (1200, 600))
+# colsize!(fig.layout, 1, Relative(1))
+# Axis of paticle box
+ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (0, containerside, 0, containerside), width = 500, height = 500)
+hidexdecorations!(ax)
+hideydecorations!(ax)
+# Axis of speed bar plot
+ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, num_particles+1, 0, 2.0maxspeed), width = 500, height = 500, xlabel = "Velocity of each particle")
+xs = 1:num_particles
+# ESC key
+quit = Observable(false)
+on(events(fig).keyboardbutton) do event
+   if event.action == Keyboard.press && event.key == Keyboard.escape
+      quit[] = true
+      notify(quit)
+   end
 end
+# Draw lines to form a border
+# Bottom
+lines!(ax, [walls_coord[:xmin], walls_coord[:xmax]], [walls_coord[:ymin], walls_coord[:ymin]], color=:black, linewidth = 8 )
+# Top
+lines!(ax, [walls_coord[:xmin], walls_coord[:xmax]], [walls_coord[:ymax], walls_coord[:ymax]], color=:black, linewidth = 8 )
+# Left
+lines!(ax, [walls_coord[:xmin], walls_coord[:xmin]], [walls_coord[:ymin], walls_coord[:ymax]], color=:black, linewidth = 8 )
+# Right
+lines!(ax, [walls_coord[:xmax], walls_coord[:xmax]], [walls_coord[:ymin], walls_coord[:ymax]], color=:black, linewidth = 8 )
+# Draw particles
+scat = scatter!(ax, positions, markersize = diam_for_scat)
+
+fps = 60
+frame_count = 0
+display(fig)
+already_collided = falses(num_particles, num_particles+4)
+
+while !quit[] # simulation loop
+
+      step!(positions, velocities, particle_diam, num_particles, containerside, dt, already_collided, walls_coord)
+      notify(positions)
+
+      ys = [ sqrt(velocities[i][1]^2 + velocities[i][2]^2) for i in xs ]
+      empty!(ax2)
+      barplot!(ax2, xs, ys, color = :blue)
+
+      # Calculate the cumulative velocity
+      ax2.subtitle = "Cumulative velocity: $(sum(ys))"
+
+      sleep(1/fps)
+      frame_count = frame_count + 1
+end
+
+GLMakie.closeall()
 
