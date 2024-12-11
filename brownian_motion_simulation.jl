@@ -6,11 +6,11 @@ using GLMakie, GeometryBasics, Observables, LinearAlgebra, Distributions
 mutable struct Particles
    rad::Float64
    num::Int64
-   pos::Observable{Vector{Point2f0}}
-   vel::Vector{Vec2f0}
+   pos::Observable{Array{Point2f0, 1}}
+   vel::Array{Vec2f0, 1}
    collided::Array{Bool, 2}
 
-   function Particles(rad::Float64, num::Int64, boundaries::@NamedTuple{xmin::Int64, xmax::Int64, ymin::Int64, ymax::Int64}, maxspeed::Float64)
+   function Particles(rad::Float64, num::Int64, boundaries::@NamedTuple{xmin::Float64, xmax::Float64, ymin::Float64, ymax::Float64}, maxspeed::Float64)
       @assert rad > 0 "Radius must be positive"
       @assert num > 0 "Number of particles must be positive"
       pos = Observable([Point2f0(rand(Uniform(boundaries[:xmin] + rad, boundaries[:xmax] - rad)), 
@@ -101,14 +101,14 @@ GLMakie.closeall()
 
 num_particles = 30
 zoomframeside = Observable(0.4)
-containerside = 2
+containerside = 2.0
 particle_diam = 0.1
 # FIX make scattered particles and axis of fixed sizes for real measure representation
 diam_for_scat = Observable( particle_diam * 270 )
 maxspeed      = 0.05
 dt            = 1
 # Coordinates for the border
-walls_coord = ( xmin = 0, xmax = containerside, ymin = 0, ymax = containerside)
+walls_coord = ( xmin = 0.0, xmax = containerside, ymin = 0.0, ymax = containerside)
 
 particles = Particles(particle_diam/2, num_particles, walls_coord, maxspeed)
 
@@ -117,7 +117,7 @@ positions  = Observable([ Point2f0(
                         rand(Uniform(walls_coord[:xmin] + particle_diam/2, walls_coord[:xmax] - particle_diam/2)), 
                         rand(Uniform(walls_coord[:ymin] + particle_diam/2, walls_coord[:ymax] - particle_diam/2)))
                                  for _ in 1:num_particles ])
-# TODO make it using Uniform from 0 to maxspeed
+
 velocities = [ Vec2f0( maxspeed * rand() * rand([-1,1]), 
                         maxspeed * rand() * rand([-1,1])) 
                      for _ in 1:num_particles ]
