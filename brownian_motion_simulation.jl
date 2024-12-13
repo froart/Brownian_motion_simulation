@@ -1,6 +1,5 @@
 using GLMakie, GeometryBasics, Observables, LinearAlgebra, Distributions
 
-# TODO make values to be depicted precisely in cm, m, etc on the screen
 # TODO create function draw and zoom, which would draw objects on the screen 
 # TODO make structure for solid objects
 
@@ -104,6 +103,11 @@ function step!(pts::Particles, container::Container, dt::Float64)
     end
 end
 
+function to_pixels(value_in_cm::Float64)
+   dpi = sqrt(1920^2 + 1080^2) / 15.6 # should be fixed with each new monitor
+   return (value_in_cm / 2.54) * dpi
+end
+
 # Configuring GLMakie
 GLMakie.activate!()
 GLMakie.closeall()
@@ -111,35 +115,36 @@ GLMakie.closeall()
 # Defining parameters of the simulation
 particles_num   = 30
 speed_max       = 0.5 # (m/s)
-dt              = 1.0 # (s)
+dt              = 0.1 # (s)
 particle_radius = 1.0 # (cm)
+window_width    = 30.0 # (cm)
+window_height   = 20.0 # (cm)
+container_size  = 10.0 # (cm)
 dpi = sqrt(1920^2 + 1080^2) / 15.6 # should be fixed with each new monitor
-particle_radius_pxs = (particle_radius / 2.54) * dpi
+particle_radius_pxs = to_pixels(particle_radius)
 # Coordinates for the borders
-container = Container(0.0, 20.0, 0.0, 20.0)
+container = Container(0.0, container_size, 0.0, container_size)
 
 # Generating particles
 pts = Particles(particle_radius, particles_num, container, speed_max)
 
 # Plot configuration
-fig = Figure(size = (1200, 600))
-# colsize!(fig.layout, 1, Relative(1))
-# Axis of paticle box
-ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (container.x_min, container.x_max, container.y_min, container.y_max), width = 500, height = 500)
-hidexdecorations!(ax)
-hideydecorations!(ax)
+fig = Figure(size = (to_pixels(window_width), to_pixels(window_height)))
 # Axis of speed bar plot
-ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, particles_num + 1, 0, 2.0speed_max), width = 500, height = 500, xlabel = "Velocity of each particle")
+#ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, particles_num + 1, 0, 2.0speed_max), width = 500, height = 500, xlabel = "Velocity of each particle")
 xs = 1:particles_num
-# ESC key
+
 quit = Observable(false)
 on(events(fig).keyboardbutton) do event
-   if event.action == Keyboard.press && event.key == Keyboard.escape
+   if event.action == Keyboard.press && event.key == Keyboard.escape # ESC key
       quit[] = true
       notify(quit)
    end
 end
-# Draw lines to form a border
+# Axis of paticle box
+ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (container.x_min, container.x_max, container.y_min, container.y_max), width = to_pixels(container_size), height = to_pixels(container_size))
+hidexdecorations!(ax)
+hideydecorations!(ax)
 # Bottom
 lines!(ax, [container.x_min, container.x_max], [container.y_min, container.y_min], color=:black, linewidth = 8 )
 # Top
@@ -150,6 +155,8 @@ lines!(ax, [container.x_min, container.x_min], [container.y_min, container.y_max
 lines!(ax, [container.x_max, container.x_max], [container.y_min, container.y_max], color=:black, linewidth = 8 )
 # Draw particles
 scat = scatter!(ax, pts.pos, markersize = particle_radius_pxs)
+# FIXME change the size of the axis
+ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, particles_num + 1, 0, 2.0speed_max), width = 500, height = 500, xlabel = "Velocity of each particle")
 
 fps = 60
 frame_count = 0
