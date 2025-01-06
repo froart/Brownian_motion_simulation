@@ -34,7 +34,6 @@ end
 function step!(pts::Particles, container::Container, dt::Float64)
 
     # TODO make computation via law of momentum conservation
-    # FIXME cumulative velocity is "jumping", which it shouldn't
     for i in 1:pts.num
         # Check for collisions with other particles and exchange velocities if needed
         for j in (i+1):pts.num
