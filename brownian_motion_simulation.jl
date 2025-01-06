@@ -23,7 +23,7 @@ mutable struct Particles
       pos = Observable([Point2f0(rand(Uniform(boundaries.x_min + diam/2, boundaries.x_max - diam/2)), 
                                  rand(Uniform(boundaries.y_min + diam/2, boundaries.y_max - diam/2)))
                         for i in 1:num])
-      vel = [Vec2f0(rand(Uniform(-maxspeed, maxspeed)), 
+      vel = [Vec2f0(rand(Uniform(-maxspeed, maxspeed)),
                     rand(Uniform(-maxspeed, maxspeed)))
              for i in 1:num]
       col = falses(num, num + 4)
@@ -41,7 +41,7 @@ function step!(pts::Particles, container::Container, dt::Float64)
             dist = sqrt((pts.pos[][j][1] - pts.pos[][i][1])^2 + (pts.pos[][j][2] - pts.pos[][i][2])^2)
       
             # if collision
-            if dist <= 2pts.diam/2 && pts.collided[i,j] == false 
+            if dist <= 2pts.diam/2 && pts.collided[i,j] == false
                # unit vector from centre to centre
                dij      =  Vec2f0( pts.pos[][j][1] - pts.pos[][i][1], pts.pos[][j][2] - pts.pos[][i][2] )
                dij_unit =  dij / sqrt( dij[1]^2 + dij[2]^2 )
@@ -114,15 +114,14 @@ GLMakie.activate!()
 GLMakie.closeall()
 
 # Defining parameters of the simulation
-particles_num   = 100
+particles_num   = 1000
 speed_max       = 1.5 # (m/s)
 dt              = 0.1 # (s)
 particle_diameter = 0.25 # (cm)
-window_width    = 20.0 # (cm)
-window_height   = 20.0 # (cm)
+window_width    = 25.0 # (cm)
+window_height   = 25.0 # (cm)
 container_size  = 10.0 # (cm)
-# dpi = sqrt(1920^2 + 1080^2) / 15.6 # should be fixed with each new monitor
-particle_diameter_px = to_pixels(particle_diameter)
+
 # Coordinates for the borders
 container = Container(0.0, container_size, 0.0, container_size)
 
@@ -132,24 +131,24 @@ pts = Particles(particle_diameter, particles_num, container, speed_max)
 # Plot configuration
 fig = Figure(size = (to_pixels(window_width), to_pixels(window_height)))
 
-
 # Axis of paticle box
 ax  = Axis(fig[1,1][1,1], aspect = 1, limits = (container.x_min, container.x_max, container.y_min, container.y_max), width = to_pixels(container_size), height = to_pixels(container_size))
 
 hidexdecorations!(ax)
 hideydecorations!(ax)
 # Bottom
-lines!(ax, [container.x_min, container.x_max], [container.y_min, container.y_min], color=:black, linewidth = 8 )
+lines!(ax, [container.x_min, container.x_max], [container.y_min, container.y_min], color=:black, linewidth = 3 )
 # Top
-lines!(ax, [container.x_min, container.x_max], [container.y_max, container.y_max], color=:black, linewidth = 8 )
+lines!(ax, [container.x_min, container.x_max], [container.y_max, container.y_max], color=:black, linewidth = 3 )
 # Left
-lines!(ax, [container.x_min, container.x_min], [container.y_min, container.y_max], color=:black, linewidth = 8 )
+lines!(ax, [container.x_min, container.x_min], [container.y_min, container.y_max], color=:black, linewidth = 3 )
 # Right
-lines!(ax, [container.x_max, container.x_max], [container.y_min, container.y_max], color=:black, linewidth = 8 )
+lines!(ax, [container.x_max, container.x_max], [container.y_min, container.y_max], color=:black, linewidth = 3 )
 # FIXME change the size of the axis
-ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, particles_num + 1, 0, 2.0speed_max), width = 500, height = 500, xlabel = "Velocity of each particle")
+ax2 = Axis(fig[1,1][1,2], aspect = 1, limits = (0, particles_num + 1, 0, 2.0speed_max), width = to_pixels(container_size), height = to_pixels(container_size), xlabel = "Velocity of each particle")
 
 # Draw particles
+particle_diameter_px = to_pixels(particle_diameter)
 scat = scatter!(ax, pts.pos, markersize = particle_diameter_px, markerspace = :pixel)
 
 quit = Observable(false)
